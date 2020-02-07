@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 
 shared_context 'essentials' do
   before do
@@ -9,6 +10,37 @@ shared_context 'essentials' do
     end
   end
 
+  context 'with an array' do
+    before do
+      @array = [{ a: 1, b: 2, c: nil }, { a: 3, b: 4, c: 7 }, { b: 5 }].map(&:with_indifferent_access)
+    end
+
+    it 'plucks for arrays' do
+      hashes = @array.pluck_to_hash(:a, :b)
+      expected = [{ a: 1, b: 2 }, { a: 3, b: 4 }, { a: nil, b: 5 }].map(&:with_indifferent_access)
+
+      expect(hashes).to eq(expected)
+
+      hashes = @array.pluck_to_hash('a', 'b')
+
+      expect(hashes).to eq(expected)
+    end
+
+    it 'plucks for arrays without keys' do
+      hashes = @array.pluck_to_hash
+      expected = [nil, nil, nil]
+
+      expect(hashes).to eq(expected)
+    end
+
+    it 'plucks arrays with alias for enumerables' do
+      hashes = @array.pluck_to_hash('a AS foo', :b)
+      expected = [{ foo: 1, b: 2 }, { foo: 3, b: 4 }, { foo: nil, b: 5 }].map(&:with_indifferent_access)
+
+      expect(hashes).to eq(expected)
+    end
+  end
+
   it 'plucks the ids of the objects to a hash correctly' do
     TestModel.all.pluck_to_hash(:id).each do |hash|
       expect(hash.class).to eq(HashWithIndifferentAccess)
@@ -17,19 +49,19 @@ shared_context 'essentials' do
   end
 
   it 'pluck field with lowercase alias' do
-    TestModel.all.pluck_to_hash('id as something').each do |hash|
+    TestModel.all.pluck_to_hash(Arel.sql('id as something')).each do |hash|
       expect(hash).to have_key(:something)
     end
   end
 
   it 'pluck field with uppercase alias' do
-    TestModel.all.pluck_to_hash('id AS otherfield').each do |hash|
+    TestModel.all.pluck_to_hash(Arel.sql('id AS otherfield')).each do |hash|
       expect(hash).to have_key(:otherfield)
     end
   end
 
   it 'pluck field with mixedcase alias' do
-    TestModel.all.pluck_to_hash('id As anotherfield').each do |hash|
+    TestModel.all.pluck_to_hash(Arel.sql('id As anotherfield')).each do |hash|
       expect(hash).to have_key(:anotherfield)
     end
   end
@@ -44,14 +76,6 @@ shared_context 'essentials' do
     TestModel.joins(:test_model_children).pluck_to_hash('test_models.id', 'test_model_children.id').each do |hash|
       expect(hash).to have_key('test_models.id')
       expect(hash).to have_key('test_model_children.id')
-    end
-  end
-
-  context 'the model does not have the attribute specified' do
-    it 'raises an error' do
-      expect do
-        TestModel.all.pluck_to_hash(:foo)
-      end.to raise_error(ActiveRecord::StatementInvalid)
     end
   end
 
@@ -85,14 +109,6 @@ shared_context 'making sure alias is fine' do
       TestModel.all.pluck_h(:id).each do |hash|
         expect(hash.class).to eq(HashWithIndifferentAccess)
         expect(hash).to have_key(:id)
-      end
-    end
-
-    context 'the model does not have the attribute specified' do
-      it 'raises an error' do
-        expect do
-          TestModel.all.pluck_h(:foo)
-        end.to raise_error(ActiveRecord::StatementInvalid)
       end
     end
 

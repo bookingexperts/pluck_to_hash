@@ -1,61 +1,81 @@
-require_relative "./pluck_to_hash/version"
+# frozen_string_literal: true
+
+require_relative './pluck_to_hash/version'
 
 module PluckToHash
-  extend ActiveSupport::Concern
-
-  module ClassMethods
+  module Extensions
     def pluck_to_hash(*keys)
+      hash_type = keys[-1].is_a?(Hash) ? keys.pop.fetch(:hash_type, HashWithIndifferentAccess) : HashWithIndifferentAccess
       block_given = block_given?
-      hash_type = keys[-1].is_a?(Hash) ? keys.pop.fetch(:hash_type,HashWithIndifferentAccess) : HashWithIndifferentAccess
+      keys_for_pluck, keys_for_hash = _process_keys(keys)
+      single_key = keys_for_pluck.size == 1
 
-      keys, formatted_keys = format_keys(keys)
-      keys_one = keys.size == 1
-
-      pluck(*keys).map do |row|
-        value = hash_type[formatted_keys.zip(keys_one ? [row] : row)]
+      pluck(*keys_for_pluck).map do |row|
+        value = row.nil? ? nil : hash_type[keys_for_hash.zip(single_key ? [row] : row)]
         block_given ? yield(value) : value
       end
     end
 
     def pluck_to_struct(*keys)
-      struct_type = keys[-1].is_a?(Hash) ? keys.pop.fetch(:struct_type,Struct) : Struct
+      struct_type = keys[-1].is_a?(Hash) ? keys.pop.fetch(:struct_type, Struct) : Struct
       block_given = block_given?
-      keys, formatted_keys = format_keys(keys)
-      keys_one = keys.size == 1
+      keys_for_pluck, keys_for_struct = _process_keys(keys)
+      single_key = keys_for_pluck.size == 1
+      struct = struct_type.new(*keys_for_struct)
 
-      struct = struct_type.new(*formatted_keys)
-      pluck(*keys).map do |row|
-        value = keys_one ? struct.new(*[row]) : struct.new(*row)
+      pluck(*keys_for_pluck).map do |row|
+        value = row.nil? ? nil : (single_key ? struct.new(row) : struct.new(*row))
         block_given ? yield(value) : value
       end
     end
 
     private
-      def get_correct_hash_type(hash, hash_type)
-        hash_type == HashWithIndifferentAccess ? hash.with_indifferent_access : hash
-      end
 
-      def format_keys(keys)
-        if keys.blank?
-          [column_names, column_names]
+    def _process_keys(keys)
+      is_array = is_a?(Array)
+
+      if keys.blank?
+        if is_array
+          [[], []]
         else
-          [
-            keys,
-            keys.map do |k|
-              case k
-              when String
-                k.split(/\bas\b/i)[-1].strip.to_sym
-              when Symbol
-                k
-              end
-            end
-          ]
+          [column_names, column_names]
         end
-      end
+      else
+        keys_for_pluck = []
+        keys_for_hash_or_struct = []
 
-    alias_method :pluck_h, :pluck_to_hash
-    alias_method :pluck_s, :pluck_to_struct
+        keys.each do |key|
+          case key
+          when String
+            key_parts =
+              key.split(/\bas\b/i).map do |part|
+                part.strip.to_sym
+              end
+
+            keys_for_pluck << (is_array ? key_parts.first : key)
+            keys_for_hash_or_struct << key_parts.last
+          when Symbol
+            keys_for_pluck << key
+            keys_for_hash_or_struct << key
+          end
+        end
+
+        [keys_for_pluck, keys_for_hash_or_struct]
+      end
+    end
+
+    alias pluck_h pluck_to_hash
+    alias pluck_s pluck_to_struct
+  end
+
+  module Concern
+    extend ActiveSupport::Concern
+
+    module ClassMethods
+      include Extensions
+    end
   end
 end
 
-ActiveRecord::Base.send(:include, PluckToHash)
+ActiveRecord::Base.include(PluckToHash::Concern)
+Array.include(PluckToHash::Extensions)

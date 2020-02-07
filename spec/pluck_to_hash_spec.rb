@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative './spec_helper'
 
 describe 'PluckToHash' do
@@ -13,7 +15,7 @@ describe 'PluckToHash' do
     describe '.pluck_to_hash' do
       before do
         TestModel.create!(serialized_attribute: [])
-        TestModel.create!(serialized_attribute: ['Zygohistomorpic', 'Prepromorphism'])
+        TestModel.create!(serialized_attribute: %w[Zygohistomorpic Prepromorphism])
         TestModel.create!(serialized_attribute: ['Comonad'])
       end
 
@@ -21,7 +23,7 @@ describe 'PluckToHash' do
         result = TestModel.pluck_to_hash(:serialized_attribute)
         expect(result).to eq [
           { serialized_attribute: [] }.with_indifferent_access,
-          { serialized_attribute: ['Zygohistomorpic', 'Prepromorphism'] }.with_indifferent_access,
+          { serialized_attribute: %w[Zygohistomorpic Prepromorphism] }.with_indifferent_access,
           { serialized_attribute: ['Comonad'] }.with_indifferent_access
         ]
       end
@@ -30,13 +32,13 @@ describe 'PluckToHash' do
         result = TestModel.pluck_to_hash(:test_attribute, :serialized_attribute)
         expect(result).to eq [
           { test_attribute: nil, serialized_attribute: [] }.with_indifferent_access,
-          { test_attribute: nil, serialized_attribute: ['Zygohistomorpic', 'Prepromorphism'] }.with_indifferent_access,
+          { test_attribute: nil, serialized_attribute: %w[Zygohistomorpic Prepromorphism] }.with_indifferent_access,
           { test_attribute: nil, serialized_attribute: ['Comonad'] }.with_indifferent_access
         ]
       end
 
-      it 'plucks coalesce as correctly' do
-        TestModel.pluck_to_hash('coalesce(sum(price_1 - price_2), 0) as difference', 'count(test_models.id) as count').each do |result|
+      it 'plucks COALESCE AS correctly' do
+        TestModel.pluck_to_hash(Arel.sql('COALESCE(SUM(price_1 - price_2), 0) AS difference'), Arel.sql('count(test_models.id) AS count')).each do |result|
           expect(result).to have_key('difference')
           expect(result).to have_key('count')
         end
