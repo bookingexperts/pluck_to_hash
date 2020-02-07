@@ -1,8 +1,7 @@
-ruby '~> 2.6.1'
 source 'https://rubygems.org'
 
-gem 'activerecord', '~> 5.2.0'
-gem 'activesupport', '~> 5.2.0'
+# Specify your gem's dependencies in pluck_to_hash.gemspec
+gemspec
 
 group :development do
   gem 'rubocop', '~> 0.73', require: false
@@ -12,7 +11,6 @@ group :development do
 end
 
 group :development, :test do
-  gem 'pry-rails'
   gem 'rspec'
   gem 'spring'
   gem 'sqlite3'
